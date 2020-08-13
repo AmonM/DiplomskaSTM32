@@ -1,0 +1,9 @@
+File_Handling_RTOS.c:27:9:Mount_SD	16	static
+File_Handling_RTOS.c:35:9:Unmount_SD	16	static
+File_Handling_RTOS.c:40:9:Write_File	16	static
+File_Handling_RTOS.c:76:9:open_file	16	static
+File_Handling_RTOS.c:85:9:close_file	8	static
+File_Handling_RTOS.c:94:9:Read_config_File	24	static
+File_Handling_RTOS.c:106:9:Create_File	16	static
+File_Handling_RTOS.c:126:9:Remove_File	16	static
+File_Handling_RTOS.c:139:10:Check_SD_Space	16	static

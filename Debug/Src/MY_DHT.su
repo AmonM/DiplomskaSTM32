@@ -1,0 +1,7 @@
+MY_DHT.c:21:6:DHT_Delay	16	static
+MY_DHT.c:28:6:Set_Pin_Output	40	static
+MY_DHT.c:38:6:Set_Pin_Input	40	static
+MY_DHT.c:50:6:DHT_Start	16	static
+MY_DHT.c:65:9:DHT_Check_Response	16	static
+MY_DHT.c:82:9:DHT_Read	16	static
+MY_DHT.c:99:9:DHT_Get_Data	32	static
