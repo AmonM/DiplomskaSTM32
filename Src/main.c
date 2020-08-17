@@ -84,13 +84,13 @@ RTC_TimeTypeDef resetTime;
 RTC_DateTypeDef resetDate;
 RTC_AlarmTypeDef sAlarm1 = {0};
 
-uint8_t prejeto[256];
+uint8_t prejeto[2048];
 char SerialNo[] = "AU0001";
 char Server[15];
 char SSID[20];
 char passwd[20];
 char Time[5];
-int stevec_casa = 0;
+int branje = 0;
 uint32_t data[3];
 
 struct Sensors{
@@ -186,8 +186,8 @@ void alarmInit(){
 }
 
 void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc){
-	  //Branje senzorjev...
-	  stevec_casa++;
+	  //Branje senzorjev, ko bo možno.
+	  branje=1;
 	  HAL_RTC_SetTime(hrtc,&resetTime,RTC_FORMAT_BIN);
 	  HAL_RTC_SetDate(hrtc, &resetDate, RTC_FORMAT_BIN);
 	  HAL_RTC_SetAlarm_IT(hrtc, &sAlarm1, RTC_FORMAT_BIN);
@@ -210,7 +210,9 @@ void sendHTTP(char *addr, char *payload){
 	  sendUART(buff2, strlen(buff2), prejeto, sizeof(prejeto), 1000);
 	  HAL_Delay(1000);
 	  sendUART(buff, strlen(buff), prejeto, sizeof(prejeto), 2000);
+	  HAL_Delay(1000);
 }
+
 /* USER CODE END 0 */
 
 /**
@@ -266,10 +268,8 @@ int main(void)
 
   alarmInit();
 
-  HAL_Delay(500);
-
   //Odziv senzorja
-  sendUART("AT\r\n", 4, prejeto, sizeof(prejeto), 200);
+  sendUART("AT\r\n", 4, prejeto, sizeof(prejeto), 400);
 
   if(prejeto[6] == 'O' && prejeto[7] == 'K'){
 	  //Dobimo odziv.
@@ -277,41 +277,38 @@ int main(void)
 
 	  HAL_Delay(500);
 
-	  //Preverimo mode delovanja. Mora biti 1.
-	  sendUART("AT+CWMODE?\r\n", 12, prejeto, sizeof(prejeto), 200);
-	  HAL_Delay(500);
-
-	  if(prejeto[20] == '2' || prejeto[20] == '3'){
-		  //Nastavimo mode na 1.
-		  sendUART("AT+CWMODE=1\r\n", 13, prejeto, sizeof(prejeto), 200);
-	  }
-
-	  //Preverimo, če je povezan v omrežje.
-	  sendUART("AT+CWJAP_CUR?\r\n", 15, prejeto, sizeof(prejeto), 200);
-	  HAL_Delay(500);
-
-	  if(prejeto[15] == 'N' && prejeto[16] == 'o'){
-		  //Ni wifi povezave.
-		  char string[40];
-
-		  sprintf(string,"AT+CWJAP=\"%s\",\"%s\"\r\n",SSID,passwd);
-		  sendUART(string, strlen(string), prejeto, sizeof(prejeto), 200);
-
-		  HAL_Delay(500);
-	  }
-
 	  char payload[50];
+
+	  sendUART("AT+CWMODE=1\r\n", 13, prejeto, sizeof(prejeto), 500);
+	  HAL_Delay(500);
+
+	  sprintf(payload,"AT+CWJAP=\"%s\",\"%s\"\r\n",SSID,passwd);
+	  sendUART(payload, strlen(payload), prejeto, sizeof(prejeto), 12000);
+
+	  HAL_Delay(1000);
+
 	  sprintf(payload,"SerialNo=%s&sensors=%03d",SerialNo,sensor.value);
 	  sendHTTP("/register", payload);
   }
+
   HAL_Delay(200);
-  HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm1, RTC_FORMAT_BIN);
+  //HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm1, RTC_FORMAT_BIN);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	if(branje){
+		//Če je branje potem beri...
+
+		//Resetiramo stanje.
+		branje = 0;
+	}
+	//Karkoli drugega.
+	HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -619,7 +616,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 19200;
+  huart1.Init.BaudRate = 115200;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -691,27 +688,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void readDHT(void const * argument){
-	float T, RH;
-	for(;;){
-		HAL_ADC_Start_DMA(&hadc1, data, sizeof(data));
-		taskENTER_CRITICAL();
-		if((sensor.value & 4) == 4){
-			DHT_Get_Data(&T, &RH, 22);
-			taskEXIT_CRITICAL();
-		    osDelay(2000);
-		}else if((sensor.value & 2) == 2){
-			DHT_Get_Data(&T, &RH, 11);
-			T = T;
-			RH = RH;
-			taskEXIT_CRITICAL();
-		    osDelay(1000);
-		}else{
-			taskEXIT_CRITICAL();
-			osDelay(10000);
-		}
-	}
-}
+
 /* USER CODE END 4 */
 
 /**
