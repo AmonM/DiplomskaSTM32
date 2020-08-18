@@ -94,7 +94,8 @@ int branje = 0;
 uint32_t data[3];
 
 struct Sensors{
-	uint8_t value;
+	uint8_t value;	//1 -> na voljo je ESP8266, 2->DHT11, 4-> DHT22, 8-> Co2, 16 -> O2, 32 -> C2H4, 64 -> S1, 128 -> S2.
+	uint8_t wifi_status; //0 ni povezave, 1 je povezava.
 } sensor;
 
 void cardInit(){
@@ -136,6 +137,7 @@ void cardInit(){
 		//Format_SD();
 		Unmount_SD("/");
 	}else{
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
 		for(;;){
 			__NOP();
 		}
@@ -257,12 +259,11 @@ int main(void)
 	  DHT_Start (11);
 	  if(DHT_Check_Response() == 1){
 		  sensor.value = (sensor.value | 2);
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
 	  }
   }else{
 	  sensor.value = (sensor.value | 4);
-	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
   }
+
 
   cardInit();
 
@@ -272,7 +273,7 @@ int main(void)
   sendUART("AT\r\n", 4, prejeto, sizeof(prejeto), 400);
 
   if(prejeto[6] == 'O' && prejeto[7] == 'K'){
-	  //Dobimo odziv.
+	  //Če je esp8266 priključen pošljemo na bazo podatke.
 	  sensor.value = (sensor.value | 1);
 
 	  HAL_Delay(500);
@@ -283,12 +284,21 @@ int main(void)
 	  HAL_Delay(500);
 
 	  sprintf(payload,"AT+CWJAP=\"%s\",\"%s\"\r\n",SSID,passwd);
-	  sendUART(payload, strlen(payload), prejeto, sizeof(prejeto), 12000);
+	  sendUART(payload, strlen(payload), prejeto, sizeof(prejeto), 6500);
+	  int indeks = strlen(prejeto)-14;
+	  for(int i=0; i < strlen(prejeto); i++){
+		  if(prejeto[indeks] == 'G' && prejeto[indeks+1] == 'O' && prejeto[indeks+2] == 'T'){
+			  sensor.wifi_status = 1;
+		  }
+	  }
 
-	  HAL_Delay(1000);
-
-	  sprintf(payload,"SerialNo=%s&sensors=%03d",SerialNo,sensor.value);
-	  sendHTTP("/register", payload);
+	  HAL_Delay(500);
+	  if(sensor.wifi_status == 1 && (sensor.value & 1) == 1){
+		  sprintf(payload,"SerialNo=%s&sensors=%03d",SerialNo,sensor.value);
+		  sendHTTP("/register", payload);
+	  }else if((sensor.value & 1) == 1){
+		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+	  }
   }
 
   HAL_Delay(200);
