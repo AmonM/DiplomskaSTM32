@@ -70,8 +70,7 @@ static void MX_SPI1_Init(void);
 static void MX_RTC_Init(void);
 static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
-void checkSensors(void const * argument);
-void readDHT(void const * argument);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -91,7 +90,8 @@ char SSID[20];
 char passwd[20];
 char Time[5];
 int branje = 0;
-uint32_t data[3];
+uint16_t data[3];
+float temp = 0, hum = 0;
 
 struct Sensors{
 	uint8_t value;	//1 -> na voljo je ESP8266, 2->DHT11, 4-> DHT22, 8-> Co2, 16 -> O2, 32 -> C2H4, 64 -> S1, 128 -> S2.
@@ -203,7 +203,7 @@ void sendUART(char *text, uint16_t length, char *received, uint16_t rec_length, 
 void sendHTTP(char *addr, char *payload){
 	  char buff[200];
 	  char buff2[20];
-
+	  if(payload[0] != '\0')
 	  sprintf(buff,"POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length:%d\r\n\r\n%s\r\n",addr,Server,strlen(payload),payload);
 	  sprintf(buff2,"AT+CIPSEND=%d\r\n",strlen(buff));
 	  sprintf(payload,"AT+CIPSTART=\"TCP\",\"%s\",80\r\n",Server);
@@ -213,6 +213,7 @@ void sendHTTP(char *addr, char *payload){
 	  HAL_Delay(1000);
 	  sendUART(buff, strlen(buff), prejeto, sizeof(prejeto), 2000);
 	  HAL_Delay(1000);
+	  sendUART("AT+CIPCLOSE\r\n",13,prejeto, sizeof(prejeto),1000);
 }
 
 /* USER CODE END 0 */
@@ -284,11 +285,12 @@ int main(void)
 	  HAL_Delay(500);
 
 	  sprintf(payload,"AT+CWJAP=\"%s\",\"%s\"\r\n",SSID,passwd);
-	  sendUART(payload, strlen(payload), prejeto, sizeof(prejeto), 6500);
+	  sendUART(payload, strlen(payload), prejeto, sizeof(prejeto), 10000);
 	  int indeks = strlen(prejeto)-14;
 	  for(int i=0; i < strlen(prejeto); i++){
 		  if(prejeto[indeks] == 'G' && prejeto[indeks+1] == 'O' && prejeto[indeks+2] == 'T'){
 			  sensor.wifi_status = 1;
+			  break;
 		  }
 	  }
 
@@ -300,7 +302,7 @@ int main(void)
 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
 	  }
   }
-
+  uint8_t aktiven = 0;
   HAL_Delay(200);
   //HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm1, RTC_FORMAT_BIN);
 
@@ -312,13 +314,30 @@ int main(void)
   {
 	if(branje){
 		//Če je branje potem beri...
-
-		//Resetiramo stanje.
+		HAL_ADC_Start_DMA(&hadc1, data, sizeof(data));
+		DHT_Get_Data(&temp, &hum, sensor.value);
 		branje = 0;
+		HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm1, RTC_FORMAT_BIN);
+	}else if(!aktiven){
+		char payload[50];
+		memset(payload,0,50);
+		memset(prejeto,0,500);
+		sprintf(payload,"SerialNo=%s",SerialNo);
+		sendHTTP("/check",payload);
+		if(prejeto[219] == '/'){
+			for(int i = 220; i < 225; i++){
+				Time[i-220] = prejeto[i];
+			}
+			aktiven = 1;
+			branje = 1;
+			alarmInit();
+		}else{
+			//Med preverjanji.
+			HAL_Delay(30000);
+		}
 	}
-	//Karkoli drugega.
-	HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
-	HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -421,10 +440,10 @@ static void MX_ADC1_Init(void)
   }
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_2;
-  sConfig.Rank = ADC_REGULAR_RANK_2;
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_19CYCLES_5;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
@@ -433,8 +452,17 @@ static void MX_ADC1_Init(void)
   }
   /** Configure Regular Channel
   */
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = ADC_REGULAR_RANK_2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure Regular Channel
+  */
   sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = ADC_REGULAR_RANK_3;
+  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
