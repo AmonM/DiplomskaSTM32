@@ -269,6 +269,7 @@ int main(void)
   cardInit();
 
   alarmInit();
+  char payload[70];
 
   //Odziv senzorja
   sendUART("AT\r\n", 4, prejeto, sizeof(prejeto), 400);
@@ -278,8 +279,6 @@ int main(void)
 	  sensor.value = (sensor.value | 1);
 
 	  HAL_Delay(500);
-
-	  char payload[50];
 
 	  sendUART("AT+CWMODE=1\r\n", 13, prejeto, sizeof(prejeto), 500);
 	  HAL_Delay(500);
@@ -303,8 +302,12 @@ int main(void)
 	  }
   }
   uint8_t aktiven = 0;
+  while(HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK){
+	  __NOP();
+	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+  }
   HAL_Delay(200);
-  //HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm1, RTC_FORMAT_BIN);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
 
   /* USER CODE END 2 */
 
@@ -318,8 +321,10 @@ int main(void)
 		DHT_Get_Data(&temp, &hum, sensor.value);
 		branje = 0;
 		HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm1, RTC_FORMAT_BIN);
+		memset(payload,0,50);
+		sprintf(payload,"SerialNo=%s&mq135=%d&RH=%5.2f&T=%5.2f",SerialNo,data[0],hum,temp);
+		sendHTTP("/index",payload);
 	}else if(!aktiven){
-		char payload[50];
 		memset(payload,0,50);
 		memset(prejeto,0,500);
 		sprintf(payload,"SerialNo=%s",SerialNo);
@@ -336,7 +341,7 @@ int main(void)
 			HAL_Delay(30000);
 		}
 	}
-
+	HAL_Delay(500);
 
     /* USER CODE END WHILE */
 
@@ -416,13 +421,13 @@ static void MX_ADC1_Init(void)
   hadc1.Instance = ADC1;
   hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 3;
+  hadc1.Init.NbrOfConversion = 1;
   hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
@@ -443,26 +448,9 @@ static void MX_ADC1_Init(void)
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
-  sConfig.SamplingTime = ADC_SAMPLETIME_19CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_601CYCLES_5;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_2;
-  sConfig.Rank = ADC_REGULAR_RANK_2;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_3;
-  sConfig.Rank = ADC_REGULAR_RANK_3;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -708,6 +696,12 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5|GPIO_PIN_7, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PF0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PF1 */
   GPIO_InitStruct.Pin = GPIO_PIN_1;
