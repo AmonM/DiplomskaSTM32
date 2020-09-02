@@ -48,8 +48,8 @@ Diplomska.bin \
 all: Diplomska.elf secondary-outputs
 
 # Tool invocations
-Diplomska.elf: $(OBJS) $(USER_OBJS) /home/amon/STM32CubeIDE/workspace_1.4.0/Diplomska/STM32F303K8TX_FLASH.ld
-	arm-none-eabi-gcc -o "Diplomska.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/amon/STM32CubeIDE/workspace_1.4.0/Diplomska/STM32F303K8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Diplomska.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
+Diplomska.elf: $(OBJS) $(USER_OBJS) /home/amon/STM32CubeIDE/workspace_1.4.0/Diplomska_test/DiplomskaSTM32/STM32F303K8TX_FLASH.ld
+	arm-none-eabi-gcc -o "Diplomska.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/home/amon/STM32CubeIDE/workspace_1.4.0/Diplomska_test/DiplomskaSTM32/STM32F303K8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Diplomska.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
