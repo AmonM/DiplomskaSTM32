@@ -177,6 +177,13 @@ void error(){
 	}
 }
 
+void done(){
+	for(;;){
+		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_7);
+		HAL_Delay(2000);
+	}
+}
+
 void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc){
 	  //Branje senzorjev, ko bo možno.
 	  branje=1;
@@ -255,9 +262,19 @@ int main(void)
 	  sensor.value = (sensor.value | 4);
   }
 
-
   cardInit();
 
+  if(HAL_GPIO_ReadPin(GPIOF, GPIO_PIN_0)){
+	  sensor.value = sensor.value | 32;
+  }
+
+  if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1)){
+	  sensor.value = sensor.value | 16;
+  }
+
+  if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6)){
+	  sensor.value = sensor.value | 8;
+  }
   alarmInit();
   char payload[70];
 
@@ -287,8 +304,11 @@ int main(void)
 	  if(sensor.wifi_status == 1 && (sensor.value & 1) == 1){
 		  sprintf(payload,"SerialNo=%s&sensors=%03d",SerialNo,sensor.value);
 		  sendHTTP("/register", payload);
+		  if(prejeto[49] != '2' || prejeto[50] != '0' || (prejeto[51] != '1' && prejeto[51] != '0')){
+			error();
+		  }
 	  }else if((sensor.value & 1) == 1){
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+		  error();
 	  }
   }
   uint8_t aktiven = 0;
@@ -313,14 +333,19 @@ int main(void)
 		HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm1, RTC_FORMAT_BIN);
 		memset(payload,0,50);
 		sprintf(payload,"SerialNo=%s&S3=%d&S2=%d&S1=%d&RH=%5.2f&T=%5.2f",SerialNo,data[0],data[1],data[2],hum,temp);
-		sendHTTP("/index",payload);
+	 	sendHTTP("/index",payload);
+	 	if(prejeto[49] == '2' && prejeto[50] == '0' && prejeto[51] == '0'){
+	 		done();
+	 	}else if(prejeto[49] != '2' || prejeto[50] != '0' || prejeto[51] != '1'){
+			error();
+		}
 	}else if(!aktiven){
 		memset(payload,0,50);
 		memset(prejeto,0,500);
 		sprintf(payload,"SerialNo=%s",SerialNo);
 		sendHTTP("/check",payload);
-		if(prejeto[219] == '/'){
-			for(int i = 220; i < 225; i++){
+		if(prejeto[219] == '/' && prejeto[220] != '/' && prejeto[221] != '/' && prejeto[222] == '/'){
+			for(int i = 220; i < 222; i++){
 				Time[i-220] = prejeto[i];
 			}
 			aktiven = 1;
